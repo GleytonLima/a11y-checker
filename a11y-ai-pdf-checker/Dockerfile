@@ -12,18 +12,27 @@ RUN ln -s /usr/bin/python3 /usr/bin/python
 # Define diretório de trabalho
 WORKDIR /app
 
-# Baixa e instala VeraPDF
+# Baixa e instala VeraPDF com executável
 RUN cd /tmp && \
     wget https://software.verapdf.org/releases/verapdf-installer.zip && \
     unzip verapdf-installer.zip && \
     cd verapdf-greenfield-* && \
     chmod +x verapdf-install && \
     printf "1\n/usr/local/verapdf\nO\n1\nN\nN\nN\n1\n" | ./verapdf-install && \
-    ln -s /usr/local/verapdf/bin/verapdf /usr/local/bin/verapdf && \
     rm -rf /tmp/verapdf-*
 
-# Verifica se VeraPDF foi instalado corretamente
-RUN /usr/local/verapdf/verapdf --version
+# Instala Poppler para pdfinfo (alternativa ao VeraPDF)
+RUN apt-get update && \
+    apt-get install -y poppler-utils && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Cria script wrapper para VeraPDF CLI
+RUN echo '#!/bin/bash\ncd /usr/local/verapdf/bin && java -Djava.awt.headless=true -cp greenfield-apps-1.28.2.jar org.verapdf.cli.VeraPdfCli "$@"' > /usr/local/bin/verapdf && \
+    chmod +x /usr/local/bin/verapdf
+
+# Verifica se o VeraPDF foi instalado
+RUN ls -la /usr/local/verapdf/bin/
 
 # Copia arquivos da aplicação
 COPY main.py /app/

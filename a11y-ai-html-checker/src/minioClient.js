@@ -73,7 +73,11 @@ class MinIOClient {
 
             const result = await this.s3.upload(params).promise();
             console.log(`✅ Uploaded ${path.basename(localFilePath)} to ${result.Location}`);
-            return result.Location;
+            return {
+                bucketKey: bucketPath,
+                url: result.Location,
+                bucket: this.bucketName
+            };
         } catch (error) {
             console.error(`❌ Failed to upload ${localFilePath}:`, error.message);
             throw error;
@@ -95,8 +99,10 @@ class MinIOClient {
                 uploadResults.push({
                     filename: report.filename,
                     extension: report.extension,
+                    bucketKey: bucketPath,
                     bucketPath: bucketPath,
-                    url: result
+                    url: result.url,
+                    bucket: result.bucket
                 });
             } catch (error) {
                 console.error(`❌ Failed to upload report ${report.filename}:`, error.message);

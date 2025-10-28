@@ -133,36 +133,57 @@ class ConsolidatedReporter {
   }
 
   /**
-   * Gera todos os relatórios (individuais + consolidados)
+   * Gera apenas relatórios individuais e faz upload para MinIO (sem consolidado para UI)
    */
   async generateAll(results, outputDir) {
     try {
       if (this.logger) {
-        this.logger.info('Generating all reports...');
+        this.logger.info('Generating individual reports only (no consolidated for UI)...');
       }
 
-      // Gerar relatórios individuais
-      const individualReports = await this.generateIndividual(results, outputDir);
+      // Gerar timestamp compartilhado
+      const timestamp = this.getTimestamp();
+      
+      // Gerar apenas relatórios individuais
+      const individualReports = [];
+      for (const result of results) {
+        const filename = this.extractFilename(result.metadata.url);
+        
+        // Gerar JSON individual
+        const individualJson = await this.jsonReporter.generate(result, outputDir, timestamp);
+        
+        // Gerar HTML individual
+        const individualHtml = await this.htmlReporter.generate(result, outputDir, timestamp);
+        
+        individualReports.push({
+          filename: filename,
+          extension: 'json',
+          localPath: individualJson
+        });
+        individualReports.push({
+          filename: filename,
+          extension: 'html', 
+          localPath: individualHtml
+        });
+      }
 
-      // Gerar relatórios consolidados
-      const consolidatedReports = await this.generate(results, outputDir);
+      // Fazer upload apenas dos relatórios individuais para MinIO
+      const baseFilename = 'html_accessibility';
+      const uploadResults = await this.uploadToMinIO(individualReports, baseFilename);
 
-      const summary = {
+      if (this.logger) {
+        this.logger.info(`MinIO upload completed. Results: ${uploadResults.length} individual files`);
+      }
+
+      return {
         totalFiles: results.length,
         individualReports: individualReports,
-        consolidatedReports: consolidatedReports,
+        minio: uploadResults,
         outputDir: outputDir
       };
-
-      if (this.logger) {
-        this.logger.success('All reports generated successfully');
-        this.printSummary(summary);
-      }
-
-      return summary;
     } catch (error) {
       if (this.logger) {
-        this.logger.error(`Failed to generate all reports: ${error.message}`);
+        this.logger.error(`Failed to generate individual reports: ${error.message}`);
       }
       throw error;
     }
@@ -287,131 +308,6 @@ class ConsolidatedReporter {
     }
   }
 
-  /**
-   * Gera todos os relatórios e faz upload para MinIO
-   */
-  async generateAll(results, outputDir) {
-    try {
-      console.log('🚀 generateAll() called!'); // Debug log
-      if (this.logger) {
-        this.logger.info('Generating all reports...');
-      }
-      
-      // Fazer upload simples para MinIO
-      const uploadResults = [];
-      
-      if (this.logger) {
-        this.logger.info('Attempting MinIO upload...');
-      }
-      
-      try {
-        // Upload dos relatórios consolidados
-        const timestamp = this.getTimestamp();
-        const consolidatedJsonPath = path.join(outputDir, `consolidated_a11y_report_${timestamp}.json`);
-        const consolidatedHtmlPath = path.join(outputDir, `consolidated_a11y_report_${timestamp}.html`);
-        
-        if (await this.fileExists(consolidatedJsonPath)) {
-          const result = await this.minioClient.uploadFile(consolidatedJsonPath, `temp/html_accessibility_${timestamp}/consolidated_a11y_report_${timestamp}.json`);
-          uploadResults.push({ filename: 'consolidated', extension: 'json', ...result });
-        }
-        
-        if (await this.fileExists(consolidatedHtmlPath)) {
-          const result = await this.minioClient.uploadFile(consolidatedHtmlPath, `temp/html_accessibility_${timestamp}/consolidated_a11y_report_${timestamp}.html`);
-          uploadResults.push({ filename: 'consolidated', extension: 'html', ...result });
-        }
-        
-        if (this.logger) {
-          this.logger.info(`MinIO upload completed. Results: ${uploadResults.length} files`);
-        }
-      } catch (error) {
-        if (this.logger) {
-          this.logger.warn(`MinIO upload failed: ${error.message}`);
-        }
-      }
-
-      // Gerar timestamp único para todos os relatórios
-      if (this.logger) {
-        this.logger.info('Generating timestamp...');
-      }
-      const timestamp = this.getTimestamp();
-      
-      if (this.logger) {
-        this.logger.info(`Timestamp generated: ${timestamp}`);
-      }
-
-      // Gerar relatórios individuais
-      if (this.logger) {
-        this.logger.info('Generating individual reports...');
-      }
-      const individualReports = await this.generateIndividual(results, outputDir);
-      
-      if (this.logger) {
-        this.logger.info('Individual reports generated successfully');
-      }
-
-      // Gerar relatórios consolidados diretamente
-      if (this.logger) {
-        this.logger.info('Generating consolidated reports...');
-      }
-      
-      const consolidatedJsonPath = await this.jsonReporter.generateConsolidated(results, outputDir, timestamp);
-      const consolidatedHtmlPath = await this.htmlReporter.generateConsolidated(results, outputDir, timestamp);
-      
-      if (this.logger) {
-        this.logger.info('Consolidated reports generated successfully');
-      }
-      
-      const consolidatedReports = {
-        json: `consolidated_a11y_report_${timestamp}.json`,
-        html: `consolidated_a11y_report_${timestamp}.html`
-      };
-
-      // Upload dos relatórios consolidados para MinIO
-      if (this.logger) {
-        this.logger.info('Attempting MinIO upload...');
-      }
-      
-      try {
-        const consolidatedJsonPath = path.join(outputDir, consolidatedReports.json);
-        const consolidatedHtmlPath = path.join(outputDir, consolidatedReports.html);
-        
-        if (await this.fileExists(consolidatedJsonPath)) {
-          const result = await this.minioClient.uploadFile(consolidatedJsonPath, `temp/html_accessibility_${timestamp}/consolidated_a11y_report_${timestamp}.json`);
-          uploadResults.push({ filename: 'consolidated', extension: 'json', ...result });
-        }
-        
-        if (await this.fileExists(consolidatedHtmlPath)) {
-          const result = await this.minioClient.uploadFile(consolidatedHtmlPath, `temp/html_accessibility_${timestamp}/consolidated_a11y_report_${timestamp}.html`);
-          uploadResults.push({ filename: 'consolidated', extension: 'html', ...result });
-        }
-        
-        if (this.logger) {
-          this.logger.info(`MinIO upload completed. Results: ${uploadResults.length} files`);
-        }
-      } catch (error) {
-        if (this.logger) {
-          this.logger.warn(`MinIO upload failed: ${error.message}`);
-        }
-      }
-
-      if (this.logger) {
-        this.logger.success('All reports generated and uploaded successfully');
-      }
-
-      return {
-        local: {
-          individual: individualReports,
-          consolidated: consolidatedReports
-        },
-        minio: uploadResults
-      };
-    } catch (error) {
-      if (this.logger) {
-        this.logger.error(`Failed to generate all reports: ${error.message}`);
-      }
-      throw error;
-    }
-  }
 
   /**
    * Verifica se um arquivo existe

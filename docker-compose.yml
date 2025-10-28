@@ -58,22 +58,28 @@ services:
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin123
+      - PDF_CHECKER_URL=http://pdf-checker:5000
+      - HTML_CHECKER_URL=http://html-checker:5001
     depends_on:
       minio:
         condition: service_healthy
       minio-client:
         condition: service_completed_successfully
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock  # Para executar Docker dentro do container
+      pdf-checker:
+        condition: service_started
+      html-checker:
+        condition: service_started
     networks:
       - a11y-network
 
-  # HTML Checker - Verificação de acessibilidade HTML
+  # HTML Checker - Verificação de acessibilidade HTML (API)
   html-checker:
     build:
       context: ./a11y-ai-html-checker
       dockerfile: Dockerfile
     container_name: a11y-html-checker
+    ports:
+      - "5001:5001"
     environment:
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=minioadmin
@@ -85,12 +91,14 @@ services:
     networks:
       - a11y-network
 
-  # PDF Checker - Verificação de acessibilidade PDF
+  # PDF Checker - Verificação de acessibilidade PDF (API)
   pdf-checker:
     build:
       context: ./a11y-ai-pdf-checker
       dockerfile: Dockerfile
     container_name: a11y-pdf-checker
+    ports:
+      - "5000:5000"
     environment:
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=minioadmin
