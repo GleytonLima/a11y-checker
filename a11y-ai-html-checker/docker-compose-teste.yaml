@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  accessibility-checker:
+    build: .
+    container_name: accessibility_checker
+    volumes:
+      # Arquivos de entrada (read-only)
+      - ./samples:/app/samples:ro
+      
+      # Templates para desenvolvimento (read-write)
+      - ./src/templates:/app/src/templates
+      
+      # Relatórios de saída (read-write)
+      - ./reports:/app/reports
+    
+    environment:
+      # Configuração WCAG
+      - WCAG_STANDARD=WCAG2AA
+      - RUNNER=axe
+      
+      # Configuração MinIO
+      - ENVIRONMENT=local
+      - MINIO_ENDPOINT=http://host.docker.internal:9010
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_BUCKET=html-reports
+      
+      # Tipos de issues
+      - INCLUDE_WARNINGS=true
+      - INCLUDE_NOTICES=false
+      
+      # Performance
+      - TIMEOUT=30000
+      - VIEWPORT_WIDTH=1920
+      - VIEWPORT_HEIGHT=1080
+      - WAIT_AFTER_LOAD=500
+      - CONCURRENCY=2
+      
+      # Logging
+      - LOG_LEVEL=info
+      - LOG_COLOR=true
+      
+      # Paths internos
+      - SAMPLES_DIR=/app/samples
+      - REPORTS_DIR=/app/reports
+      - HTTP_PORT=8000
+    
+    # Recursos (opcional - limitar uso)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 512M
+    
+    # Security (opcional)
+    security_opt:
+      - no-new-privileges:true
+    
+    # Não reiniciar (execução única)
+    restart: "no"

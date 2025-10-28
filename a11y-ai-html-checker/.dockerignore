@@ -1,0 +1,11 @@
+node_modules/
+npm-debug.log
+reports/
+.git/
+.gitignore
+.env
+README.md
+*.md
+build-image.sh
+test-compose.sh
+.DS_Store

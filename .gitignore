@@ -1,0 +1,4 @@
+**/reports/*
+!**/reports/.gitkeep
+**/*_a11y_report_*.json
+**/*_a11y_report_*.html

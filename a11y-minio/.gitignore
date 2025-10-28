@@ -1,0 +1,12 @@
+# Arquivos de dados do MinIO
+data/
+
+# Arquivos de ambiente locais
+.env
+
+# Logs
+*.log
+
+# Arquivos temporários
+*.tmp
+*.temp

@@ -1,0 +1,4 @@
+# VeraPDF será instalado via Dockerfile ou sistema
+# Não há dependências Python específicas para VeraPDF
+# Mantendo apenas as dependências básicas do AWS Lambda
+boto3
