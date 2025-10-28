@@ -17,6 +17,7 @@ Ambos os sistemas são containerizados com Docker e incluem integração com Min
 a11y-ai-checker/
 ├── a11y-ai-pdf-checker/     # Sistema de análise de PDFs
 ├── a11y-ai-html-checker/    # Sistema de análise de HTML
+├── a11y-ai-checker-ui/      # Interface web unificada
 ├── a11y-minio/              # Configuração do MinIO
 └── README.md               # Este arquivo
 ```
@@ -41,6 +42,15 @@ Sistema para análise de acessibilidade em páginas HTML:
 - **Relatórios**: JSON e HTML com interface visual
 - **Integração**: MinIO para armazenamento automático
 
+### UI Web (`a11y-ai-checker-ui/`)
+
+Interface web unificada para ambos os sistemas:
+
+- **Tecnologia**: Node.js + Express + HTML/CSS/JS
+- **Funcionalidades**: Upload de arquivos, análise assíncrona, download de relatórios
+- **Integração**: Gerencia containers Docker automaticamente
+- **Acesso**: Interface web em http://localhost:3000
+
 ### MinIO (`a11y-minio/`)
 
 Servidor de armazenamento de objetos compatível com S3:
@@ -57,21 +67,36 @@ Servidor de armazenamento de objetos compatível com S3:
 
 ## Instalação Rápida
 
-### 1. Iniciar MinIO
+### Opção 1: Interface Web (Recomendado)
+
+```bash
+cd a11y-ai-checker-ui
+./test-ui.sh
+```
+
+Este script automaticamente:
+- Verifica e constrói as imagens necessárias
+- Inicia MinIO e UI
+- Configura buckets automaticamente
+- Abre interface em http://localhost:3000
+
+### Opção 2: Sistemas Individuais
+
+#### 1. Iniciar MinIO
 
 ```bash
 cd a11y-minio
 docker-compose up -d
 ```
 
-### 2. Testar PDF Checker
+#### 2. Testar PDF Checker
 
 ```bash
 cd a11y-ai-pdf-checker
 ./test-compose.sh
 ```
 
-### 3. Testar HTML Checker
+#### 3. Testar HTML Checker
 
 ```bash
 cd a11y-ai-html-checker
@@ -80,13 +105,23 @@ docker-compose -f docker-compose-teste.yaml up --abort-on-container-exit
 
 ## Uso
 
-### Análise de PDFs
+### Interface Web (Recomendado)
+
+1. Acesse http://localhost:3000
+2. Selecione o tipo de arquivo (PDF ou HTML)
+3. Faça upload do arquivo (drag-and-drop ou seleção)
+4. Aguarde a análise assíncrona
+5. Baixe os relatórios gerados
+
+### Sistemas Individuais
+
+#### Análise de PDFs
 
 1. Coloque os PDFs na pasta `a11y-ai-pdf-checker/samples/`
 2. Execute: `./test-compose.sh`
 3. Relatórios salvos em `reports/` e MinIO
 
-### Análise de HTML
+#### Análise de HTML
 
 1. Coloque os arquivos HTML na pasta `a11y-ai-html-checker/samples/`
 2. Execute: `docker-compose -f docker-compose-teste.yaml up --abort-on-container-exit`
@@ -156,3 +191,4 @@ Para problemas específicos de cada sistema, consulte os READMEs individuais:
 
 - [PDF Checker](a11y-ai-pdf-checker/README.md)
 - [HTML Checker](a11y-ai-html-checker/README.md)
+- [UI Web](a11y-ai-checker-ui/README.md)

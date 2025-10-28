@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A11Y AI Checker - Upload</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: #d6420c;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+        }
+
+        .upload-section {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .file-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #fafafa;
+        }
+
+        .file-input:hover {
+            border-color: #d6420c;
+            background: #fff5f2;
+        }
+
+        .file-input.dragover {
+            border-color: #d6420c;
+            background: #fff5f2;
+        }
+
+        .file-type-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .file-type-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .file-type-btn.active {
+            border-color: #d6420c;
+            background: #d6420c;
+            color: white;
+        }
+
+        .analyze-btn {
+            width: 100%;
+            padding: 15px;
+            background: #d6420c;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .analyze-btn:hover:not(:disabled) {
+            background: #b8350a;
+        }
+
+        .analyze-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .status-section {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            display: none;
+        }
+
+        .status-section.show {
+            display: block;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+
+        .status-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .status-indicator.pending {
+            background: #ffc107;
+        }
+
+        .status-indicator.running {
+            background: #17a2b8;
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-indicator.completed {
+            background: #28a745;
+        }
+
+        .status-indicator.error {
+            background: #dc3545;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .results-section {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: none;
+        }
+
+        .results-section.show {
+            display: block;
+        }
+
+        .result-item {
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+
+        .result-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .result-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #d6420c;
+        }
+
+        .download-btn {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #d6420c;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-right: 10px;
+            margin-top: 10px;
+            transition: background 0.3s ease;
+        }
+
+        .download-btn:hover {
+            background: #b8350a;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>A11Y AI Checker</h1>
+            <p>Sistema de verificação de acessibilidade para PDF e HTML</p>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+
+        <div class="upload-section">
+            <h2 style="margin-bottom: 20px;">Upload de Arquivo</h2>
+            
+            <div class="file-type-selector">
+                <div class="file-type-btn active" data-type="pdf">
+                    <strong>PDF</strong><br>
+                    <small>Documentos PDF</small>
+                </div>
+                <div class="file-type-btn" data-type="html">
+                    <strong>HTML</strong><br>
+                    <small>Páginas Web</small>
+                </div>
+            </div>
+
+            <div class="file-input-wrapper">
+                <div class="file-input" id="fileInput">
+                    <p>Arraste e solte seu arquivo aqui ou clique para selecionar</p>
+                    <p style="margin-top: 10px; font-size: 14px; color: #666;">
+                        Formatos suportados: <span id="supportedFormats">PDF</span>
+                    </p>
+                </div>
+                <input type="file" id="fileSelect" class="hidden" accept=".pdf">
+            </div>
+
+            <button class="analyze-btn" id="analyzeBtn" disabled>
+                Analisar Arquivo
+            </button>
+        </div>
+
+        <div class="status-section" id="statusSection">
+            <h2 style="margin-bottom: 20px;">Status da Análise</h2>
+            <div id="statusList"></div>
+        </div>
+
+        <div class="results-section" id="resultsSection">
+            <h2 style="margin-bottom: 20px;">Resultados</h2>
+            <div id="resultsList"></div>
+        </div>
+    </div>
+
+    <script>
+        class A11YChecker {
+            constructor() {
+                this.selectedType = 'pdf';
+                this.selectedFile = null;
+                this.currentJobId = null;
+                
+                this.initializeEventListeners();
+            }
+
+            initializeEventListeners() {
+                // File type selection
+                document.querySelectorAll('.file-type-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        this.selectFileType(e.target.closest('.file-type-btn').dataset.type);
+                    });
+                });
+
+                // File input
+                const fileInput = document.getElementById('fileInput');
+                const fileSelect = document.getElementById('fileSelect');
+
+                fileInput.addEventListener('click', () => fileSelect.click());
+                fileSelect.addEventListener('change', (e) => this.handleFileSelect(e.target.files[0]));
+
+                // Drag and drop
+                fileInput.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    fileInput.classList.add('dragover');
+                });
+
+                fileInput.addEventListener('dragleave', () => {
+                    fileInput.classList.remove('dragover');
+                });
+
+                fileInput.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    fileInput.classList.remove('dragover');
+                    this.handleFileSelect(e.dataTransfer.files[0]);
+                });
+
+                // Analyze button
+                document.getElementById('analyzeBtn').addEventListener('click', () => {
+                    this.startAnalysis();
+                });
+            }
+
+            selectFileType(type) {
+                this.selectedType = type;
+                
+                // Update UI
+                document.querySelectorAll('.file-type-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                document.querySelector(`[data-type="${type}"]`).classList.add('active');
+
+                // Update file input
+                const fileSelect = document.getElementById('fileSelect');
+                const supportedFormats = document.getElementById('supportedFormats');
+                
+                if (type === 'pdf') {
+                    fileSelect.accept = '.pdf';
+                    supportedFormats.textContent = 'PDF';
+                } else {
+                    fileSelect.accept = '.html,.htm';
+                    supportedFormats.textContent = 'HTML, HTM';
+                }
+
+                // Reset file selection
+                this.selectedFile = null;
+                this.updateAnalyzeButton();
+            }
+
+            handleFileSelect(file) {
+                if (!file) return;
+
+                // Validate file type
+                const isValidType = this.selectedType === 'pdf' 
+                    ? file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+                    : file.type === 'text/html' || file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm');
+
+                if (!isValidType) {
+                    this.showError(`Tipo de arquivo inválido. Selecione um arquivo ${this.selectedType.toUpperCase()}.`);
+                    return;
+                }
+
+                this.selectedFile = file;
+                this.updateFileInput();
+                this.updateAnalyzeButton();
+                this.hideError();
+            }
+
+            updateFileInput() {
+                const fileInput = document.getElementById('fileInput');
+                if (this.selectedFile) {
+                    fileInput.innerHTML = `
+                        <p><strong>${this.selectedFile.name}</strong></p>
+                        <p style="margin-top: 5px; font-size: 14px; color: #666;">
+                            ${(this.selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                    `;
+                } else {
+                    fileInput.innerHTML = `
+                        <p>Arraste e solte seu arquivo aqui ou clique para selecionar</p>
+                        <p style="margin-top: 10px; font-size: 14px; color: #666;">
+                            Formatos suportados: <span id="supportedFormats">${this.selectedType.toUpperCase()}</span>
+                        </p>
+                    `;
+                }
+            }
+
+            updateAnalyzeButton() {
+                const btn = document.getElementById('analyzeBtn');
+                btn.disabled = !this.selectedFile;
+            }
+
+            async startAnalysis() {
+                if (!this.selectedFile) return;
+
+                try {
+                    // Show status section
+                    document.getElementById('statusSection').classList.add('show');
+                    document.getElementById('resultsSection').classList.remove('show');
+
+                    // Create FormData
+                    const formData = new FormData();
+                    formData.append('file', this.selectedFile);
+                    formData.append('type', this.selectedType);
+
+                    // Start analysis
+                    const response = await fetch('/api/analyze', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Erro: ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    this.currentJobId = result.jobId;
+
+                    // Start polling
+                    this.pollStatus();
+
+                } catch (error) {
+                    this.showError(`Erro ao iniciar análise: ${error.message}`);
+                }
+            }
+
+            async pollStatus() {
+                if (!this.currentJobId) return;
+
+                try {
+                    const response = await fetch(`/api/status/${this.currentJobId}`);
+                    const status = await response.json();
+
+                    this.updateStatusDisplay(status);
+
+                    if (status.status === 'completed') {
+                        this.showResults(status.results);
+                    } else if (status.status === 'error') {
+                        this.showError(`Erro na análise: ${status.error}`);
+                    } else {
+                        // Continue polling
+                        setTimeout(() => this.pollStatus(), 2000);
+                    }
+
+                } catch (error) {
+                    this.showError(`Erro ao verificar status: ${error.message}`);
+                }
+            }
+
+            updateStatusDisplay(status) {
+                const statusList = document.getElementById('statusList');
+                const steps = [
+                    { name: 'Upload do arquivo', key: 'upload' },
+                    { name: 'Iniciando análise', key: 'starting' },
+                    { name: 'Executando verificação', key: 'analyzing' },
+                    { name: 'Gerando relatórios', key: 'reporting' },
+                    { name: 'Finalizando', key: 'completed' }
+                ];
+
+                statusList.innerHTML = steps.map(step => {
+                    const stepStatus = status.steps[step.key] || 'pending';
+                    return `
+                        <div class="status-item">
+                            <div style="display: flex; align-items: center;">
+                                <div class="status-indicator ${stepStatus}"></div>
+                                <span>${step.name}</span>
+                            </div>
+                            <span style="font-size: 14px; color: #666;">
+                                ${this.getStatusText(stepStatus)}
+                            </span>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            getStatusText(status) {
+                const texts = {
+                    pending: 'Aguardando...',
+                    running: 'Em execução...',
+                    completed: 'Concluído',
+                    error: 'Erro'
+                };
+                return texts[status] || 'Desconhecido';
+            }
+
+            showResults(results) {
+                const resultsList = document.getElementById('resultsList');
+                
+                resultsList.innerHTML = results.map(result => `
+                    <div class="result-item">
+                        <div class="result-title">${result.filename}</div>
+                        <p>Tipo: ${result.type}</p>
+                        <p>Problemas encontrados: ${result.issues || 'N/A'}</p>
+                        <p>Status: ${result.status}</p>
+                        ${result.downloadUrl ? `
+                            <a href="${result.downloadUrl}" class="download-btn" target="_blank">
+                                Baixar Relatório
+                            </a>
+                        ` : ''}
+                    </div>
+                `).join('');
+
+                document.getElementById('resultsSection').classList.add('show');
+            }
+
+            showError(message) {
+                const errorDiv = document.getElementById('errorMessage');
+                errorDiv.textContent = message;
+                errorDiv.classList.add('show');
+            }
+
+            hideError() {
+                document.getElementById('errorMessage').classList.remove('show');
+            }
+        }
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', () => {
+            new A11YChecker();
+        });
+    </script>
+</body>
+</html>

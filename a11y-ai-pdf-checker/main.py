@@ -1,4 +1,5 @@
 import os
+import sys
 import boto3
 import json
 import subprocess
@@ -216,4 +217,60 @@ def lambda_handler(event, context):
         error_msg = f'Filename : {file_basename} | Exception encountered while executing VeraPDF operation: {e}'
         print(error_msg)
         return error_msg
+
+def main():
+    """
+    Função principal para execução direta do script
+    """
     
+    if len(sys.argv) != 2:
+        print("Uso: python3 main.py <caminho_do_arquivo_pdf>")
+        sys.exit(1)
+    
+    file_basename = sys.argv[1]
+    
+    print(f"Processando arquivo: {file_basename}")
+    
+    # Verificar se o arquivo já existe no MinIO
+    s3_client = get_s3_client()
+    
+    try:
+        # Verificar se o arquivo já está no MinIO
+        s3_client.head_object(Bucket='pdf', Key=file_basename)
+        print(f"Arquivo já existe no MinIO: {file_basename}")
+    except Exception as e:
+        print(f"Arquivo não encontrado no MinIO: {file_basename}")
+        print(f"Erro: {e}")
+        sys.exit(1)
+    
+    # Criar evento simulado para o lambda_handler
+    event = {
+        "s3_bucket": "pdf",
+        "chunks": [
+            {
+                "s3_key": file_basename
+            }
+        ]
+    }
+    
+    # Simular contexto Lambda
+    class MockContext:
+        def __init__(self):
+            self.function_name = "pdf-accessibility-checker"
+            self.function_version = "1"
+            self.invoked_function_arn = "arn:aws:lambda:us-east-1:123456789012:function:pdf-accessibility-checker"
+            self.memory_limit_in_mb = 128
+            self.remaining_time_in_millis = 30000
+    
+    context = MockContext()
+    
+    try:
+        result = lambda_handler(event, context)
+        print(f"Resultado: {result}")
+        return 0
+    except Exception as e:
+        print(f"Erro na execução: {e}")
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main())

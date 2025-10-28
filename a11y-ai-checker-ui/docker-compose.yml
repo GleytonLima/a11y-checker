@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # MinIO Server
+  minio:
+    image: minio/minio:latest
+    container_name: a11y-minio
+    ports:
+      - "9010:9000"
+      - "9011:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # MinIO Client (setup buckets)
+  minio-client:
+    image: minio/mc:latest
+    container_name: a11y-minio-client
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      until /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin123; do
+        echo 'Waiting for MinIO to be ready...';
+        sleep 1;
+      done;
+      /usr/bin/mc mb myminio/pdf --ignore-existing;
+      /usr/bin/mc mb myminio/html-reports --ignore-existing;
+      /usr/bin/mc mb myminio/temp --ignore-existing;
+      /usr/bin/mc policy set public myminio/pdf;
+      /usr/bin/mc policy set public myminio/html-reports;
+      /usr/bin/mc policy set public myminio/temp;
+      echo 'MinIO buckets configured successfully!';
+      "
+    restart: "no"
+
+  # A11Y UI Server
+  a11y-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: a11y-ui
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+    volumes:
+      - ./a11y-ai-checker-ui/uploads:/app/uploads
+      - ./a11y-ai-checker-ui/reports:/app/reports
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      minio-client:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  minio_data:
+    driver: local
