@@ -80,6 +80,13 @@
             display: flex;
             gap: 10px;
             margin-bottom: 20px;
+            border: none;
+            padding: 0;
+        }
+
+        .file-type-selector legend {
+            margin-bottom: 10px;
+            font-weight: 600;
         }
 
         .file-type-btn {
@@ -91,12 +98,28 @@
             cursor: pointer;
             transition: all 0.3s ease;
             text-align: center;
+            outline: none;
+        }
+
+        .file-type-btn:hover {
+            border-color: #d6420c;
+            background: #fff5f2;
+        }
+
+        .file-type-btn:focus {
+            border-color: #d6420c;
+            background: #fff5f2;
+            box-shadow: 0 0 0 3px rgba(214, 66, 12, 0.2);
         }
 
         .file-type-btn.active {
             border-color: #d6420c;
             background: #d6420c;
             color: white;
+        }
+
+        .file-type-btn.active:focus {
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
         }
 
         .analyze-btn {
@@ -109,10 +132,16 @@
             font-size: 16px;
             cursor: pointer;
             transition: background 0.3s ease;
+            outline: none;
         }
 
         .analyze-btn:hover:not(:disabled) {
             background: #b8350a;
+        }
+
+        .analyze-btn:focus:not(:disabled) {
+            background: #b8350a;
+            box-shadow: 0 0 0 3px rgba(214, 66, 12, 0.3);
         }
 
         .analyze-btn:disabled {
@@ -141,10 +170,17 @@
             border: 1px solid #eee;
             border-radius: 6px;
             margin-bottom: 10px;
+            outline: none;
+            cursor: default;
         }
 
         .status-item:last-child {
             margin-bottom: 0;
+        }
+
+        .status-item:focus {
+            border-color: #d6420c;
+            box-shadow: 0 0 0 3px rgba(214, 66, 12, 0.2);
         }
 
         .status-indicator {
@@ -216,10 +252,16 @@
             margin-right: 10px;
             margin-top: 10px;
             transition: background 0.3s ease;
+            outline: none;
         }
 
         .download-btn:hover {
             background: #b8350a;
+        }
+
+        .download-btn:focus {
+            background: #b8350a;
+            box-shadow: 0 0 0 3px rgba(214, 66, 12, 0.3);
         }
 
         .error-message {
@@ -252,40 +294,43 @@
         <div class="upload-section">
             <h2 style="margin-bottom: 20px;">Upload de Arquivo</h2>
             
-            <div class="file-type-selector">
-                <div class="file-type-btn active" data-type="pdf">
+            <fieldset class="file-type-selector">
+                <legend class="hidden">Selecionar tipo de arquivo</legend>
+                <div class="file-type-btn active" data-type="pdf" role="button" tabindex="0" aria-pressed="true" aria-label="Selecionar PDF - Documentos PDF">
                     <strong>PDF</strong><br>
                     <small>Documentos PDF</small>
                 </div>
-                <div class="file-type-btn" data-type="html">
+                <div class="file-type-btn" data-type="html" role="button" tabindex="0" aria-pressed="false" aria-label="Selecionar HTML - Páginas Web">
                     <strong>HTML</strong><br>
                     <small>Páginas Web</small>
                 </div>
-            </div>
+            </fieldset>
 
             <div class="file-input-wrapper">
-                <div class="file-input" id="fileInput">
+                <div class="file-input" id="fileInput" role="button" tabindex="0" aria-describedby="fileHelp" aria-label="Selecionar arquivo para upload">
                     <p>Arraste e solte seu arquivo aqui ou clique para selecionar</p>
                     <p style="margin-top: 10px; font-size: 14px; color: #666;">
                         Formatos suportados: <span id="supportedFormats">PDF</span>
                     </p>
                 </div>
-                <input type="file" id="fileSelect" class="hidden" accept=".pdf">
+                <input type="file" id="fileSelect" class="hidden" accept=".pdf" aria-describedby="fileHelp">
+                <div id="fileHelp" class="hidden">Selecione um arquivo PDF ou HTML para análise de acessibilidade</div>
             </div>
 
-            <button class="analyze-btn" id="analyzeBtn" disabled>
+            <button class="analyze-btn" id="analyzeBtn" disabled aria-describedby="analyzeHelp">
                 Analisar Arquivo
             </button>
+            <div id="analyzeHelp" class="hidden">Inicia a análise de acessibilidade do arquivo selecionado</div>
         </div>
 
-        <div class="status-section" id="statusSection">
-            <h2 style="margin-bottom: 20px;">Status da Análise</h2>
-            <div id="statusList"></div>
+        <div class="status-section" id="statusSection" role="region" aria-labelledby="statusTitle" aria-live="polite">
+            <h2 id="statusTitle" style="margin-bottom: 20px;">Status da Análise</h2>
+            <div id="statusList" role="list"></div>
         </div>
 
-        <div class="results-section" id="resultsSection">
-            <h2 style="margin-bottom: 20px;">Resultados</h2>
-            <div id="resultsList"></div>
+        <div class="results-section" id="resultsSection" role="region" aria-labelledby="resultsTitle" aria-live="polite">
+            <h2 id="resultsTitle" style="margin-bottom: 20px;">Resultados</h2>
+            <div id="resultsList" role="list"></div>
         </div>
     </div>
 
@@ -305,14 +350,33 @@
                     btn.addEventListener('click', (e) => {
                         this.selectFileType(e.target.closest('.file-type-btn').dataset.type);
                     });
+                    
+                    // Keyboard support for file type buttons
+                    btn.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            this.selectFileType(btn.dataset.type);
+                        }
+                    });
                 });
 
                 // File input
                 const fileInput = document.getElementById('fileInput');
                 const fileSelect = document.getElementById('fileSelect');
 
-                fileInput.addEventListener('click', () => fileSelect.click());
+                fileInput.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    fileSelect.click();
+                });
                 fileSelect.addEventListener('change', (e) => this.handleFileSelect(e.target.files[0]));
+
+                // Keyboard support for file input
+                fileInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        fileSelect.click();
+                    }
+                });
 
                 // Drag and drop
                 fileInput.addEventListener('dragover', (e) => {
@@ -342,8 +406,11 @@
                 // Update UI
                 document.querySelectorAll('.file-type-btn').forEach(btn => {
                     btn.classList.remove('active');
+                    btn.setAttribute('aria-pressed', 'false');
                 });
-                document.querySelector(`[data-type="${type}"]`).classList.add('active');
+                const activeBtn = document.querySelector(`[data-type="${type}"]`);
+                activeBtn.classList.add('active');
+                activeBtn.setAttribute('aria-pressed', 'true');
 
                 // Update file input
                 const fileSelect = document.getElementById('fileSelect');
@@ -360,6 +427,7 @@
                 // Reset file selection
                 this.selectedFile = null;
                 this.updateAnalyzeButton();
+                this.updateFileInput();
             }
 
             handleFileSelect(file) {
@@ -472,16 +540,17 @@
                     { name: 'Finalizando', key: 'completed' }
                 ];
 
-                statusList.innerHTML = steps.map(step => {
+                statusList.innerHTML = steps.map((step, index) => {
                     const stepStatus = status.steps[step.key] || 'pending';
+                    const statusText = this.getStatusText(stepStatus);
                     return `
-                        <div class="status-item">
+                        <div class="status-item" role="listitem" tabindex="0" aria-label="${step.name}: ${statusText}">
                             <div style="display: flex; align-items: center;">
-                                <div class="status-indicator ${stepStatus}"></div>
+                                <div class="status-indicator ${stepStatus}" aria-hidden="true"></div>
                                 <span>${step.name}</span>
                             </div>
                             <span style="font-size: 14px; color: #666;">
-                                ${this.getStatusText(stepStatus)}
+                                ${statusText}
                             </span>
                         </div>
                     `;
@@ -501,15 +570,16 @@
             showResults(results) {
                 const resultsList = document.getElementById('resultsList');
                 
-                resultsList.innerHTML = results.map(result => `
-                    <div class="result-item">
+                resultsList.innerHTML = results.map((result, index) => `
+                    <div class="result-item" role="listitem">
                         <div class="result-title">${result.filename}</div>
                         <p>Tipo: ${result.type}</p>
                         <p>Problemas encontrados: ${result.issues || 'N/A'}</p>
                         <p>Status: ${result.status}</p>
                         ${result.downloadUrl ? `
-                            <a href="${result.downloadUrl}" class="download-btn" target="_blank">
-                                Baixar Relatório
+                            <a href="${result.downloadUrl}" class="download-btn" target="_blank" 
+                               aria-label="Baixar relatório ${result.type} para ${result.filename} com ${result.issues || 0} problemas encontrados">
+                                Baixar Relatório ${result.type.toUpperCase()}
                             </a>
                         ` : ''}
                     </div>
