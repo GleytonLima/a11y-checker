@@ -86,123 +86,6 @@ def download_file_from_minio(file_name):
         logger.error(f"Erro ao baixar arquivo do MinIO: {str(e)}")
         return None
 
-def generate_html_report(analysis_result, html_path, base_name):
-    """
-    Gera relatório HTML a partir do resultado da análise VeraPDF
-    """
-    try:
-        # Contar problemas encontrados
-        issues_count = len(analysis_result.get('items', []))
-        
-        # Determinar status
-        if issues_count == 0:
-            status = "✅ Acessível"
-            status_class = "success"
-        else:
-            status = f"⚠️ {issues_count} problema(s) encontrado(s)"
-            status_class = "warning"
-        
-        # Gerar HTML
-        html_content = f"""
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relatório de Acessibilidade PDF - {base_name}</title>
-    <style>
-        body {{
-            font-family: Arial, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }}
-        .header {{
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }}
-        .status {{
-            padding: 10px 20px;
-            border-radius: 5px;
-            font-weight: bold;
-            margin: 10px 0;
-        }}
-        .success {{
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }}
-        .warning {{
-            background-color: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeaa7;
-        }}
-        .content {{
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }}
-        .issue {{
-            background: #f8f9fa;
-            border-left: 4px solid #dc3545;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 0 5px 5px 0;
-        }}
-        .json-data {{
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 5px;
-            padding: 15px;
-            margin: 20px 0;
-            font-family: monospace;
-            white-space: pre-wrap;
-            overflow-x: auto;
-        }}
-        .timestamp {{
-            color: #6c757d;
-            font-size: 0.9em;
-        }}
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>📄 Relatório de Acessibilidade PDF</h1>
-        <h2>{base_name}</h2>
-        <div class="status {status_class}">{status}</div>
-        <p class="timestamp">Gerado em: {datetime.now().strftime("%d/%m/%Y às %H:%M")}</p>
-    </div>
-    
-    <div class="content">
-        <h3>📊 Resumo da Análise</h3>
-        <p><strong>Total de problemas encontrados:</strong> {issues_count}</p>
-        
-        {f'<h3>⚠️ Problemas Encontrados</h3>' if issues_count > 0 else '<h3>✅ Nenhum problema encontrado</h3>'}
-        
-        {''.join([f'<div class="issue"><strong>Problema {i+1}:</strong> {item.get("description", "Descrição não disponível")}</div>' for i, item in enumerate(analysis_result.get('items', []))]) if issues_count > 0 else '<p>Este PDF não apresenta problemas de acessibilidade detectados pelo VeraPDF.</p>'}
-        
-        <h3>🔍 Dados Técnicos (JSON)</h3>
-        <div class="json-data">{json.dumps(analysis_result, indent=2, ensure_ascii=False)}</div>
-    </div>
-</body>
-</html>
-        """
-        
-        # Salvar arquivo HTML
-        with open(html_path, 'w', encoding='utf-8') as f:
-            f.write(html_content)
-        
-        logger.info(f"Relatório HTML gerado: {html_path}")
-        return True
-        
-    except Exception as e:
-        logger.error(f"Erro ao gerar relatório HTML: {str(e)}")
-        return False
 
 def upload_report_to_minio(local_file_path, minio_key):
     """
@@ -222,84 +105,108 @@ def upload_report_to_minio(local_file_path, minio_key):
 
 def run_verapdf_analysis(pdf_path):
     """
-    Executa análise de acessibilidade PDF usando pdfinfo (Poppler) como alternativa ao VeraPDF
+    Executa análise de acessibilidade PDF usando VeraPDF real
     """
     try:
-        output_path = create_json_output_file_path()
+        # Criar diretórios de saída
+        os.makedirs("/tmp/PDFAccessibilityChecker", exist_ok=True)
+        os.makedirs("/app/reports", exist_ok=True)
         
-        # Usar pdfinfo para análise básica de acessibilidade
-        cmd = ["pdfinfo", pdf_path]
+        base_name = os.path.splitext(os.path.basename(pdf_path))[0]
+        timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
         
-        logger.info(f"Executando pdfinfo: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        # Preparar caminhos para JSON e HTML
+        json_output = f"/tmp/PDFAccessibilityChecker/{base_name}_vera_report_{timestamp}.json"
+        html_output = f"/tmp/PDFAccessibilityChecker/{base_name}_vera_report_{timestamp}.html"
         
-        if result.returncode != 0:
-            logger.error(f"pdfinfo falhou: {result.stderr}")
+        # Comando VeraPDF para validação de acessibilidade (PDF/UA) - JSON
+        cmd_json = [
+            '/usr/local/verapdf/verapdf',
+            '--format', 'json',
+            '--flavour', 'ua1',
+            pdf_path
+        ]
+        
+        # Comando VeraPDF para validação de acessibilidade (PDF/UA) - HTML
+        cmd_html = [
+            '/usr/local/verapdf/verapdf',
+            '--format', 'html',
+            '--flavour', 'ua1',
+            pdf_path
+        ]
+        
+        logger.info(f"Executando VeraPDF JSON: {' '.join(cmd_json)}")
+        
+        # Executa o comando JSON
+        result_json = subprocess.run(
+            cmd_json,
+            capture_output=True,
+            text=True,
+            timeout=300  # 5 minutos de timeout
+        )
+        
+        logger.info(f"Executando VeraPDF HTML: {' '.join(cmd_html)}")
+        
+        # Executa o comando HTML
+        result_html = subprocess.run(
+            cmd_html,
+            capture_output=True,
+            text=True,
+            timeout=300  # 5 minutos de timeout
+        )
+        
+        if (result_json.returncode == 0 or result_json.returncode == 1) and \
+           (result_html.returncode == 0 or result_html.returncode == 1):
+            # Exit code 0 = PDF conforme, Exit code 1 = PDF não conforme (mas válido)
+            # Salva o resultado JSON no arquivo de saída
+            with open(json_output, 'w', encoding='utf-8') as f:
+                f.write(result_json.stdout)
+            logger.info(f"Relatório JSON VeraPDF salvo em: {json_output}")
+            
+            # Salva o resultado HTML no arquivo de saída
+            with open(html_output, 'w', encoding='utf-8') as f:
+                f.write(result_html.stdout)
+            logger.info(f"Relatório HTML VeraPDF salvo em: {html_output}")
+            
+            # Parsear JSON do VeraPDF para extrair informações
+            try:
+                vera_json = json.loads(result_json.stdout)
+                
+                # Contar problemas reais do VeraPDF
+                issues_count = 0
+                if 'report' in vera_json and 'jobs' in vera_json['report']:
+                    for job in vera_json['report']['jobs']:
+                        if 'validationResult' in job:
+                            for result in job['validationResult']:
+                                if 'details' in result:
+                                    issues_count += result['details'].get('failedRules', 0)
+                
+                logger.info(f"Análise VeraPDF concluída: {issues_count} problemas encontrados")
+                
+                return {
+                    "vera_json_path": json_output,
+                    "vera_html_path": html_output,
+                    "issues_count": issues_count,
+                    "vera_data": vera_json
+                }
+            except json.JSONDecodeError as e:
+                logger.error(f"Erro ao fazer parse do JSON do VeraPDF: {str(e)}")
+                return None
+        else:
+            logger.error(f"Erro ao executar VeraPDF JSON: {result_json.stderr}")
+            logger.error(f"Erro ao executar VeraPDF HTML: {result_html.stderr}")
             return None
             
-        logger.info("pdfinfo executado com sucesso")
-        
-        # Analisar saída do pdfinfo para problemas de acessibilidade
-        pdfinfo_output = result.stdout
-        issues = []
-        
-        # Verificar se o PDF tem tags (indicador de acessibilidade)
-        if "Tagged: no" in pdfinfo_output:
-            issues.append({
-                "type": "error",
-                "code": "PDF_NOT_TAGGED",
-                "message": "PDF não possui tags de estrutura, dificultando a leitura por leitores de tela",
-                "context": "Documento PDF sem estrutura semântica"
-            })
-        
-        # Verificar se tem texto (PDFs só com imagens não são acessíveis)
-        if "Pages: 0" in pdfinfo_output or "Pages: 1" in pdfinfo_output:
-            # Verificar se é só imagem
-            if "Encrypted: no" in pdfinfo_output:
-                issues.append({
-                    "type": "warning", 
-                    "code": "POSSIBLE_IMAGE_ONLY_PDF",
-                    "message": "PDF pode conter apenas imagens, verificando se há texto extraível",
-                    "context": "Documento pode não ter texto extraível"
-                })
-        
-        # Criar resultado no formato esperado
-        analysis_result = {
-            "document": {
-                "name": os.path.basename(pdf_path),
-                "pages": 1,  # Será atualizado pelo pdfinfo
-                "tagged": "Tagged: yes" in pdfinfo_output
-            },
-            "items": issues,
-            "summary": {
-                "total_issues": len(issues),
-                "errors": len([i for i in issues if i["type"] == "error"]),
-                "warnings": len([i for i in issues if i["type"] == "warning"])
-            }
-        }
-        
-        # Salvar resultado JSON
-        json_path = output_path
-        with open(json_path, 'w', encoding='utf-8') as f:
-            json.dump(analysis_result, f, indent=2, ensure_ascii=False)
-        logger.info(f"Relatório JSON salvo em: {json_path}")
-        
-        # Gerar relatório HTML
-        html_path = output_path.replace('.json', '.html')
-        generate_html_report(analysis_result, html_path, os.path.splitext(os.path.basename(pdf_path))[0])
-        
-        logger.info(f"Análise concluída: {len(issues)} problemas encontrados")
-        return analysis_result
-            
     except subprocess.TimeoutExpired:
-        logger.error("pdfinfo timeout")
+        logger.error("VeraPDF timeout")
         return None
     except FileNotFoundError:
-        logger.error("Erro: Comando 'pdfinfo' não encontrado. Certifique-se de que Poppler está instalado.")
+        logger.error("Erro: Comando '/usr/local/verapdf/verapdf' não encontrado.")
         return None
     except Exception as e:
-        logger.error(f"Erro na análise: {str(e)}")
+        logger.error(f"Erro na análise VeraPDF: {str(e)}")
         return None
+
 
 def process_pdf_file(file_name):
     """
@@ -314,27 +221,26 @@ def process_pdf_file(file_name):
             return {"error": "Falha ao baixar arquivo do MinIO"}
         
         # 2. Executar análise VeraPDF
-        analysis_result = run_verapdf_analysis(local_pdf_path)
-        if not analysis_result:
+        vera_result = run_verapdf_analysis(local_pdf_path)
+        if not vera_result:
             return {"error": "Falha na análise VeraPDF"}
         
-        # 3. Gerar nome do relatório
+        # 3. Usar os relatórios gerados pelo VeraPDF diretamente
         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
         base_name = os.path.splitext(file_name)[0]
-        report_key = f"temp/pdf_accessibility_{timestamp}/{base_name}_accessibility_report.json"
         
-        # 4. Salvar relatório JSON localmente
-        json_report_path = f"/app/reports/{base_name}_accessibility_report_{timestamp}.json"
-        with open(json_report_path, 'w', encoding='utf-8') as f:
-            json.dump(analysis_result, f, indent=2, ensure_ascii=False)
+        # Copiar relatórios VeraPDF para diretório de reports
+        json_report_path = f"/app/reports/{base_name}_vera_report_{timestamp}.json"
+        html_report_path = f"/app/reports/{base_name}_vera_report_{timestamp}.html"
         
-        # 5. Gerar relatório HTML
-        html_report_path = f"/app/reports/{base_name}_accessibility_report_{timestamp}.html"
-        generate_html_report(analysis_result, html_report_path, base_name)
+        # Copiar arquivos VeraPDF para o diretório de reports
+        import shutil
+        shutil.copy2(vera_result["vera_json_path"], json_report_path)
+        shutil.copy2(vera_result["vera_html_path"], html_report_path)
         
-        # 6. Upload dos relatórios para MinIO
-        json_key = f"temp/pdf_accessibility_{timestamp}/{base_name}_accessibility_report.json"
-        html_key = f"temp/pdf_accessibility_{timestamp}/{base_name}_accessibility_report.html"
+        # 4. Upload dos relatórios VeraPDF para MinIO
+        json_key = f"temp/pdf_accessibility_{timestamp}/{base_name}_vera_report.json"
+        html_key = f"temp/pdf_accessibility_{timestamp}/{base_name}_vera_report.html"
         
         upload_success_json = upload_report_to_minio(json_report_path, json_key)
         upload_success_html = upload_report_to_minio(html_report_path, html_key)
@@ -348,17 +254,17 @@ def process_pdf_file(file_name):
         return {
             "status": "completed",
             "filename": file_name,
-            "issues": len(analysis_result.get('items', [])),
+            "issues": vera_result["issues_count"],
             "results": [
                 {
-                    "filename": f"{base_name}_accessibility_report",
+                    "filename": f"{base_name}_vera_report",
                     "extension": "json",
                     "bucketKey": json_key,
                     "url": f"/api/download/{json_key}",
                     "bucket": "pdf"
                 },
                 {
-                    "filename": f"{base_name}_accessibility_report",
+                    "filename": f"{base_name}_vera_report",
                     "extension": "html",
                     "bucketKey": html_key,
                     "url": f"/api/download/{html_key}",
@@ -438,6 +344,47 @@ def download_report(minio_key):
     except Exception as e:
         logger.error(f"Erro no download: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+def lambda_handler(event, context):
+    """
+    Função lambda_handler para compatibilidade com test_runner.py
+    """
+    logger.info(f"Received event: {event}")
+    s3_bucket = event.get('s3_bucket', None)
+    chunks = event.get('chunks', [])
+    
+    if chunks:
+        first_chunk = chunks[0]
+        s3_key = first_chunk.get('s3_key', None)
+        if s3_key:
+            import os
+            file_basename = os.path.basename(s3_key)
+            # Remove chunk suffix if present
+            if "_chunk_" in file_basename:
+                file_basename = file_basename.split("_chunk_")[0] + os.path.splitext(file_basename)[1]
+    else:
+        return {"error": "No chunks found in event"}
+    
+    logger.info(f"File basename: {file_basename}")
+    logger.info(f"s3_bucket: {s3_bucket}")
+    
+    try:
+        # Processar arquivo usando a função existente
+        result = process_pdf_file(file_basename)
+        
+        if 'error' in result:
+            error_msg = f"Filename : {file_basename} | {result['error']}"
+            logger.error(error_msg)
+            return error_msg
+        else:
+            success_msg = f"Filename : {file_basename} | Saved accessibility report with {result['issues']} issues found"
+            logger.info(success_msg)
+            return success_msg
+            
+    except Exception as e:
+        error_msg = f'Filename : {file_basename} | Exception encountered while executing VeraPDF operation: {e}'
+        logger.error(error_msg)
+        return error_msg
 
 if __name__ == '__main__':
     logger.info("PDF Checker API iniciando...")
