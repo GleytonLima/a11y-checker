@@ -45,6 +45,27 @@ class AccessibilityChecker {
   }
 
   /**
+   * Inicializa o sistema sem validar diretórios (modo arquivo específico)
+   */
+  async initializeWithoutValidation() {
+    try {
+      // Carregar configurações
+      this.config = loadConfig();
+      
+      // Criar logger
+      this.logger = createLogger(this.config.logLevel, this.config.logColor);
+      
+      // Exibir header
+      this.displayHeader();
+      
+      this.logger.info('Initialization completed successfully (without directory validation)');
+    } catch (error) {
+      this.logger?.error(`Initialization failed: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
    * Exibe header da aplicação
    */
   displayHeader() {
@@ -354,6 +375,81 @@ class AccessibilityChecker {
       throw error;
     }
   }
+
+  /**
+   * Executa análise para um arquivo específico (modo Docker)
+   */
+  async runWithSpecificFile(filename) {
+    this.startTime = Date.now();
+    
+    try {
+      // 1. Inicializar sem validar diretórios (modo arquivo específico)
+      await this.initializeWithoutValidation();
+      
+      // 2. Verificar se arquivo existe no MinIO
+      const MinIOClient = require('./src/minioClient');
+      const minioClient = new MinIOClient();
+      
+      const isAvailable = await minioClient.isAvailable();
+      if (!isAvailable) {
+        throw new Error('MinIO not available');
+      }
+      
+      // 3. Baixar arquivo do MinIO
+      const localPath = `/tmp/${filename}`;
+      await minioClient.downloadFile(filename, localPath);
+      
+      // 4. Iniciar servidor HTTP
+      await this.startHttpServer();
+      
+      // 5. Analisar arquivo específico
+      const scanner = new FileScanner(path.dirname(localPath));
+      const files = await scanner.scan();
+      
+      if (files.length === 0) {
+        throw new Error(`No files found for analysis: ${filename}`);
+      }
+
+      // Preparar URLs
+      const urls = files.map(file => this.httpServer.getUrl(file.filename));
+      
+      // Configurar Pa11y Runner
+      const pa11yRunner = new Pa11yRunner(this.config);
+      pa11yRunner.setLogger(this.logger);
+      
+      // Executar análise
+      this.logger.info(`Starting analysis of ${files.length} files`);
+      
+      const results = await pa11yRunner.analyzeMultiple(urls, this.config.concurrency);
+      
+      // Processar resultados
+      this.results = results.map((result, index) => ({
+        ...result,
+        metadata: {
+          ...result.metadata,
+          file: files[index].filename,
+          url: urls[index]
+        }
+      }));
+      
+      // 6. Gerar relatórios consolidados
+      await this.generateConsolidatedReports();
+      
+      // 7. Parar servidor HTTP
+      await this.stopHttpServer();
+      
+      // 8. Exibir resumo final
+      this.printFinalSummary();
+      
+    } catch (error) {
+      this.logger.error(`Fatal error: ${error.message}`);
+      
+      // Tentar parar servidor em caso de erro
+      await this.stopHttpServer();
+      
+      throw error;
+    }
+  }
 }
 
 // Entry point
@@ -361,7 +457,14 @@ class AccessibilityChecker {
   const checker = new AccessibilityChecker();
   
   try {
-    await checker.run();
+    // Verificar se foi passado um arquivo específico como parâmetro
+    const specificFile = process.argv[2];
+    if (specificFile) {
+      console.log(`Processing specific file: ${specificFile}`);
+      await checker.runWithSpecificFile(specificFile);
+    } else {
+      await checker.run();
+    }
     process.exit(0);
   } catch (error) {
     console.error('Fatal error:', error.message);

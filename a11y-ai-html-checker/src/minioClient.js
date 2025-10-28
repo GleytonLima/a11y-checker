@@ -130,6 +130,26 @@ class MinIOClient {
     }
 
     /**
+     * Baixa um arquivo do MinIO
+     */
+    async downloadFile(bucketKey, localPath) {
+        try {
+            const params = {
+                Bucket: this.bucketName,
+                Key: bucketKey
+            };
+            
+            const result = await this.s3.getObject(params).promise();
+            fs.writeFileSync(localPath, result.Body);
+            console.log(`✅ Downloaded ${bucketKey} to ${localPath}`);
+            return localPath;
+        } catch (error) {
+            console.error(`❌ Failed to download ${bucketKey}:`, error.message);
+            throw error;
+        }
+    }
+
+    /**
      * Determina o Content-Type baseado na extensão do arquivo
      */
     getContentType(filePath) {

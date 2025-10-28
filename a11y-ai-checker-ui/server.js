@@ -167,7 +167,7 @@ async function runAnalysis(jobId, filePath, fileType, fileName) {
             // Filtrar objetos relacionados ao arquivo atual
             const baseFileName = fileName.replace(/\.[^/.]+$/, '');
             const relevantObjects = listResult.Contents.filter(obj => 
-                obj.Key.includes(baseFileName) && 
+                (obj.Key.includes(baseFileName) || obj.Key.includes('consolidated')) && 
                 (obj.Key.endsWith('.json') || obj.Key.endsWith('.html'))
             );
             
@@ -217,7 +217,8 @@ async function runAnalysis(jobId, filePath, fileType, fileName) {
             }
         }
 
-        updateJobStatus(jobId, 'completed', { reporting: 'completed' }, null, results);
+        updateJobStatus(jobId, 'completed', { reporting: 'completed', completed: 'completed' }, null, results);
+        console.log(`Job ${jobId} updated to completed status with ${results.length} results`);
 
             // Cleanup uploaded file (aguardar mais tempo para debug)
             setTimeout(async () => {
@@ -352,7 +353,9 @@ app.get('/api/download/*', async (req, res) => {
         
         // Determinar bucket baseado no tipo de arquivo
         let bucketName;
-        if (bucketKey.includes('accessibility_report') || bucketKey.includes('pdf') || bucketKey.includes('temp/')) {
+        if (bucketKey.includes('temp/html_accessibility') || bucketKey.includes('html-reports')) {
+            bucketName = 'html-reports';
+        } else if (bucketKey.includes('accessibility_report') || bucketKey.includes('pdf') || bucketKey.includes('temp/')) {
             bucketName = 'pdf';
         } else {
             bucketName = 'html-reports';

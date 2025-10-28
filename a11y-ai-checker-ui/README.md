@@ -27,7 +27,7 @@ Esta UI permite:
 - **Upload**: Multer
 - **Storage**: MinIO (S3-compatible)
 - **Container Management**: Docker API
-- **Styling**: CSS customizado (estilo Itaú)
+- **Styling**: CSS customizado
 
 ## Pré-requisitos
 
