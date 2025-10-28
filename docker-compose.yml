@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  # MinIO - Armazenamento de arquivos e relatórios
+  minio:
+    image: minio/minio:latest
+    container_name: a11y-minio
+    ports:
+      - "9010:9000"      # API
+      - "9011:9001"      # Console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - a11y-network
+
+  # MinIO Client - Configuração inicial dos buckets
+  minio-client:
+    image: minio/mc:latest
+    container_name: a11y-minio-client
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      until /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin123; do
+        echo 'Waiting for MinIO to be ready...';
+        sleep 1;
+      done;
+      /usr/bin/mc mb myminio/pdf --ignore-existing;
+      /usr/bin/mc mb myminio/temp --ignore-existing;
+      /usr/bin/mc mb myminio/html-reports --ignore-existing;
+      /usr/bin/mc policy set public myminio/pdf;
+      /usr/bin/mc policy set public myminio/html-reports;
+      /usr/bin/mc policy set public myminio/temp;
+      echo 'MinIO buckets configured successfully!';
+      "
+    networks:
+      - a11y-network
+
+  # UI - Interface web para upload e visualização
+  a11y-ui:
+    build:
+      context: ./a11y-ai-checker-ui
+      dockerfile: Dockerfile
+    container_name: a11y-ui
+    ports:
+      - "3000:3000"
+    environment:
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+    depends_on:
+      minio:
+        condition: service_healthy
+      minio-client:
+        condition: service_completed_successfully
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # Para executar Docker dentro do container
+    networks:
+      - a11y-network
+
+  # HTML Checker - Verificação de acessibilidade HTML
+  html-checker:
+    build:
+      context: ./a11y-ai-html-checker
+      dockerfile: Dockerfile
+    container_name: a11y-html-checker
+    environment:
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_BUCKET=html-reports
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - a11y-network
+
+  # PDF Checker - Verificação de acessibilidade PDF
+  pdf-checker:
+    build:
+      context: ./a11y-ai-pdf-checker
+      dockerfile: Dockerfile
+    container_name: a11y-pdf-checker
+    environment:
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_BUCKET=pdf
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - a11y-network
+
+volumes:
+  minio_data:
+    driver: local
+
+networks:
+  a11y-network:
+    driver: bridge
